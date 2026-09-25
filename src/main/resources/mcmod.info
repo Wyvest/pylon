@@ -7,7 +7,7 @@
   "url": "https://github.com/notdevcody/pylon",
   "authors": [ "notdevcody" ],
   "credits": "",
-  "logoFile": "/assets/pylon/icon.png",
+  "logoFile": "/assets/pylon/icon-256x.png",
   "parent": "",
   "screenshots": [],
   "dependencies": []

@@ -20,7 +20,7 @@ public class CpwModContainer extends DummyModContainer {
         String version = getClass().getPackage().getImplementationVersion();
         md.version = version == null ? "dev" : version;
         md.authorList.add("notdevcody");
-        md.logoFile = "/assets/pylon/icon.png";
+        md.logoFile = "/assets/pylon/icon-256x.png";
     }
 
     @Override
