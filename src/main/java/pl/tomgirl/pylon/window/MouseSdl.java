@@ -123,14 +123,16 @@ public class MouseSdl {
         lastX = x;
         lastY = y;
         accumDx = accumDy = 0;
-        SDL_WarpMouseInWindow(handle, toSdlX(x), toSdlY(y));
+        MainThread.run(() -> SDL_WarpMouseInWindow(handle, toSdlX(x), toSdlY(y)));
     }
 
     public void grabMouse(boolean grab) {
-        if (!grab) {
-            SDL_WarpMouseInWindow(handle, toSdlX(lastX), toSdlY(lastY));
-        }
-        SDL_SetWindowRelativeMouseMode(handle, grab);
+        MainThread.run(() -> {
+            if (!grab) {
+                SDL_WarpMouseInWindow(handle, toSdlX(lastX), toSdlY(lastY));
+            }
+            SDL_SetWindowRelativeMouseMode(handle, grab);
+        });
         grabbed = grab;
         reset();
         if (!GameHooks.screenPatchAvailable) {

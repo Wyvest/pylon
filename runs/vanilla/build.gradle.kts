@@ -39,7 +39,6 @@ loom {
             programArguments.addAll("--username", "Player", "--session", "0", "--version", "1.6.4")
             jvmArguments.add("-Djava.util.logging.config.file=${rootProject.file("runs/logging.properties")}")
             jvmArguments.add("--enable-native-access=ALL-UNNAMED")
-            if (System.getProperty("os.name").startsWith("Mac")) jvmArguments.add("-XstartOnFirstThread")
         }
     }
 }

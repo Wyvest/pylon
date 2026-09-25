@@ -103,7 +103,7 @@ public class DisplaySdl {
 
     public void setTextInputActive(boolean active) {
         if (handle > 0 && textInputActive) {
-            checkSdlError(SDLKeyboard.SDL_ClearComposition(handle));
+            MainThread.run(() -> checkSdlError(SDLKeyboard.SDL_ClearComposition(handle)));
         }
         textInputX = -1;
         textInputRequested = active;
@@ -125,11 +125,13 @@ public class DisplaySdl {
         ) {
             return;
         }
-        try (MemoryStack stack = stackPush()) {
-            SDL_Rect.Buffer area = SDL_Rect.calloc(1, stack)
-                .x(areaX).y(areaY).w(areaWidth).h(areaHeight);
-            checkSdlError(SDLKeyboard.SDL_SetTextInputArea(handle, area, areaCursor));
-        }
+        MainThread.run(() -> {
+            try (MemoryStack stack = stackPush()) {
+                SDL_Rect.Buffer area = SDL_Rect.calloc(1, stack)
+                    .x(areaX).y(areaY).w(areaWidth).h(areaHeight);
+                checkSdlError(SDLKeyboard.SDL_SetTextInputArea(handle, area, areaCursor));
+            }
+        });
         textInputX = areaX;
         textInputY = areaY;
         textInputWidth = areaWidth;
@@ -142,11 +144,13 @@ public class DisplaySdl {
             return;
         }
 
-        if (textInputRequested) {
-            checkSdlError(SDLKeyboard.SDL_StartTextInput(handle));
-        } else {
-            SDLKeyboard.SDL_StopTextInput(handle);
-        }
+        MainThread.run(() -> {
+            if (textInputRequested) {
+                checkSdlError(SDLKeyboard.SDL_StartTextInput(handle));
+            } else {
+                SDLKeyboard.SDL_StopTextInput(handle);
+            }
+        });
         textInputActive = textInputRequested;
         textInputX = -1;
     }
@@ -159,7 +163,7 @@ public class DisplaySdl {
     public void setTitle(@NotNull String title) {
         this.title = title;
         if (isCreated()) {
-            SDL_SetWindowTitle(handle, title);
+            MainThread.run(() -> SDL_SetWindowTitle(handle, title));
         }
     }
 
@@ -260,14 +264,17 @@ public class DisplaySdl {
         ByteBuffer pixels = MemoryUtil.memAlloc(icon.remaining());
         try {
             pixels.put(icon.duplicate()).flip();
-            try (SDL_Surface surface = SDLSurface.SDL_CreateSurfaceFrom(
-                size, size, SDLPixels.SDL_PIXELFORMAT_RGBA32, pixels, size * 4
-            )) {
-                checkSdlError(surface != null);
-                checkSdlError(SDL_SetWindowIcon(handle, surface));
-            } catch (Exception e) {
-                Pylon.LOG.log(Level.SEVERE, "Failed to set window icon", e);
-            }
+            int iconSize = size;
+            MainThread.run(() -> {
+                try (SDL_Surface surface = SDLSurface.SDL_CreateSurfaceFrom(
+                    iconSize, iconSize, SDLPixels.SDL_PIXELFORMAT_RGBA32, pixels, iconSize * 4
+                )) {
+                    checkSdlError(surface != null);
+                    checkSdlError(SDL_SetWindowIcon(handle, surface));
+                } catch (Exception e) {
+                    Pylon.LOG.log(Level.SEVERE, "Failed to set window icon", e);
+                }
+            });
         } finally {
             MemoryUtil.memFree(pixels);
         }
@@ -289,11 +296,17 @@ public class DisplaySdl {
     }
 
     public void processMessages() {
-        if (!SDL_IsMainThread()) {
+        if (!MainThread.DISPATCH && !SDL_IsMainThread()) {
             return;
         }
 
         windowResized = false;
+        MainThread.run(this::pollEvents);
+        Keyboard.poll();
+        Mouse.poll();
+    }
+
+    private void pollEvents() {
         while (SDL_PollEvent(event)) {
             switch (event.type()) {
                 case SDL_EVENT_QUIT:
@@ -358,8 +371,6 @@ public class DisplaySdl {
                     break;
             }
         }
-        Keyboard.poll();
-        Mouse.poll();
     }
 
     private static void checkSdlError(boolean success) {
@@ -373,6 +384,11 @@ public class DisplaySdl {
             return;
         }
 
+        MainThread.run(this::initSdlVideo);
+        videoInitialized = true;
+    }
+
+    private void initSdlVideo() {
         SDL_SetMemoryFunctions(
             MemoryUtil::nmemAllocChecked,
             MemoryUtil::nmemCallocChecked,
@@ -393,8 +409,6 @@ public class DisplaySdl {
         if (!SDL_Init(SDL_INIT_VIDEO)) {
             throw new IllegalStateException("Unable to initialize SDL: " + SDL_GetError());
         }
-
-        videoInitialized = true;
     }
 
     public void create(@NotNull GpuSurface fallbackSurface) throws LWJGLException {
@@ -417,24 +431,27 @@ public class DisplaySdl {
             throw throwable;
         }
 
-        try (MemoryStack ms = stackPush()) {
-            setFullscreen(fullscreenDeferred);
-
-            IntBuffer width = ms.mallocInt(1);
-            IntBuffer height = ms.mallocInt(1);
-            checkSdlError(SDL_GetWindowSizeInPixels(handle, width, height));
-            framebufferWidth = Math.max(1, width.get(0));
-            framebufferHeight = Math.max(1, height.get(0));
-        }
+        setFullscreen(fullscreenDeferred);
+        MainThread.run(() -> {
+            try (MemoryStack ms = stackPush()) {
+                IntBuffer width = ms.mallocInt(1);
+                IntBuffer height = ms.mallocInt(1);
+                checkSdlError(SDL_GetWindowSizeInPixels(handle, width, height));
+                framebufferWidth = Math.max(1, width.get(0));
+                framebufferHeight = Math.max(1, height.get(0));
+            }
+        });
 
         Mouse.create();
         Keyboard.create();
-        checkSdlError(SDL_ShowWindow(handle));
-        checkSdlError(SDL_RaiseWindow(handle));
-        if (SDL_IsMainThread()) {
-            SDL_PumpEvents();
-        }
-        focused = (SDL_GetWindowFlags(handle) & SDL_WINDOW_INPUT_FOCUS) != 0;
+        MainThread.run(() -> {
+            checkSdlError(SDL_ShowWindow(handle));
+            checkSdlError(SDL_RaiseWindow(handle));
+            if (SDL_IsMainThread()) {
+                SDL_PumpEvents();
+            }
+            focused = (SDL_GetWindowFlags(handle) & SDL_WINDOW_INPUT_FOCUS) != 0;
+        });
         updateTextInputState();
         if (cachedIcons != null) {
             setIcon(cachedIcons);
@@ -484,8 +501,10 @@ public class DisplaySdl {
                 width = windowedWidth;
                 height = windowedHeight;
             }
-            SDL_SetWindowFullscreen(handle, fullscreen);
-            SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
+            MainThread.run(() -> {
+                SDL_SetWindowFullscreen(handle, fullscreen);
+                SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
+            });
             windowResized = true;
         } catch (Throwable t) {
             Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen: ", t);
@@ -531,15 +550,17 @@ public class DisplaySdl {
         }
         handle = -1L;
         textInputX = -1;
-        if (SDL_WasInit(SDL_INIT_VIDEO) != 0) {
-            SDL_QuitSubSystem(SDL_INIT_VIDEO);
-        }
+        MainThread.run(() -> {
+            if (SDL_WasInit(SDL_INIT_VIDEO) != 0) {
+                SDL_QuitSubSystem(SDL_INIT_VIDEO);
+            }
+            SDL_Quit();
+        });
         if (event != null) {
             event.free();
             event = null;
             windowEvent = null;
         }
-        SDL_Quit();
         videoInitialized = false;
         try (MemoryStack stack = stackPush()) {
             PointerBuffer funcs = stack.mallocPointer(4);
@@ -568,7 +589,7 @@ public class DisplaySdl {
     public void setResizable(boolean isResizable) {
         resizable = isResizable;
         if (isCreated()) {
-            SDL_SetWindowResizable(handle, resizable);
+            MainThread.run(() -> SDL_SetWindowResizable(handle, resizable));
         }
     }
 

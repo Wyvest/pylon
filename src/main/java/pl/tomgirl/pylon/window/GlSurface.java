@@ -33,6 +33,23 @@ public class GlSurface implements GpuSurface {
             throw new IllegalStateException("Surface has already been created");
         }
 
+        MainThread.run(() -> createSdlWindow(title, width, height, resizable));
+
+        try {
+            context = check(SDL_GL_CreateContext(window));
+            check(SDL_GL_LoadLibrary((ByteBuffer) null));
+            Configuration.OPENGL_EXPLICIT_INIT.set(true);
+            GL.create(SDLVideo::SDL_GL_GetProcAddress);
+            glInitialized = true;
+            capabilities = GL.createCapabilities(MemoryUtil::memCallocPointer);
+            return window;
+        } catch (RuntimeException | Error throwable) {
+            destroy();
+            throw throwable;
+        }
+    }
+
+    private void createSdlWindow(String title, int width, int height, boolean resizable) {
         int properties = (int) check(SDL_CreateProperties());
         try {
             check(SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED));
@@ -49,19 +66,6 @@ public class GlSurface implements GpuSurface {
             window = check(SDL_CreateWindowWithProperties(properties));
         } finally {
             SDL_DestroyProperties(properties);
-        }
-
-        try {
-            context = check(SDL_GL_CreateContext(window));
-            check(SDL_GL_LoadLibrary((ByteBuffer) null));
-            Configuration.OPENGL_EXPLICIT_INIT.set(true);
-            GL.create(SDLVideo::SDL_GL_GetProcAddress);
-            glInitialized = true;
-            capabilities = GL.createCapabilities(MemoryUtil::memCallocPointer);
-            return window;
-        } catch (RuntimeException | Error throwable) {
-            destroy();
-            throw throwable;
         }
     }
 
@@ -125,7 +129,7 @@ public class GlSurface implements GpuSurface {
             context = 0;
         }
         if (window != 0) {
-            SDL_DestroyWindow(window);
+            MainThread.run(() -> SDL_DestroyWindow(window));
             window = 0;
         }
     }

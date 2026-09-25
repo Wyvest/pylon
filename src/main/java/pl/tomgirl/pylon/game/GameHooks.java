@@ -3,6 +3,7 @@ package pl.tomgirl.pylon.game;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import pl.tomgirl.pylon.window.MainThread;
 import java.nio.ByteBuffer;
 
 import javax.imageio.ImageIO;
@@ -19,12 +20,12 @@ public final class GameHooks {
     private GameHooks() {}
 
     public static String getClipboard() {
-        String text = SDLClipboard.SDL_GetClipboardText();
+        String text = MainThread.call(SDLClipboard::SDL_GetClipboardText);
         return text == null ? "" : text;
     }
 
     public static void setClipboard(String text) {
-        SDLClipboard.SDL_SetClipboardText(text);
+        MainThread.run(() -> SDLClipboard.SDL_SetClipboardText(text));
     }
 
     public static void setIcon() {
