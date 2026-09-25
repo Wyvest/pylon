@@ -2,6 +2,7 @@ package org.lwjgl.util.glu;
 
 import org.lwjgl.opengl.Util;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
@@ -156,12 +157,24 @@ public class GLU {
         return Registry.gluCheckExtension(extName, extString);
     }
 
+    public static int gluBuild2DMipmaps(int target, int components, int width, int height, int format, int type, ByteBuffer data) {
+        return MipMap.gluBuild2DMipmaps(target, components, width, height, format, type, data);
+    }
+
+    public static int gluScaleImage(int format, int widthIn, int heightIn, int typeIn, ByteBuffer dataIn, int widthOut, int heightOut, int typeOut, ByteBuffer dataOut) {
+        return MipMap.gluScaleImage(format, widthIn, heightIn, typeIn, dataIn, widthOut, heightOut, typeOut, dataOut);
+    }
+
     public static String gluErrorString(int error_code) {
-        return switch (error_code) {
-            case GLU_INVALID_ENUM -> "Invalid enum (glu)";
-            case GLU_INVALID_VALUE -> "Invalid value (glu)";
-            case GLU_OUT_OF_MEMORY -> "Out of memory (glu)";
-            default -> Util.translateGLErrorString(error_code);
-        };
+        switch (error_code) {
+            case GLU_INVALID_ENUM:
+                return "Invalid enum (glu)";
+            case GLU_INVALID_VALUE:
+                return "Invalid value (glu)";
+            case GLU_OUT_OF_MEMORY:
+                return "Out of memory (glu)";
+            default:
+                return Util.translateGLErrorString(error_code);
+        }
     }
 }
