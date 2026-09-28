@@ -55,6 +55,7 @@ public class DisplaySdl {
 
     private boolean resizable;
     private boolean windowResized = true;
+    private boolean resizePending;
     private boolean minimized;
     private boolean fullscreen;
     private boolean fullscreenDeferred;
@@ -176,6 +177,7 @@ public class DisplaySdl {
         framebufferWidth = width = windowedWidth = mode.getWidth();
         framebufferHeight = height = windowedHeight = mode.getHeight();
         windowResized = true;
+        resizePending = true;
     }
 
     public int getWidth() {
@@ -300,7 +302,8 @@ public class DisplaySdl {
             return;
         }
 
-        windowResized = false;
+        windowResized = resizePending;
+        resizePending = false;
         MainThread.run(this::pollEvents);
         Keyboard.poll();
         Mouse.poll();
@@ -441,6 +444,7 @@ public class DisplaySdl {
                 framebufferHeight = Math.max(1, height.get(0));
             }
         });
+        resizePending = true;
 
         Mouse.create();
         Keyboard.create();
@@ -506,6 +510,7 @@ public class DisplaySdl {
                 SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
             });
             windowResized = true;
+            resizePending = true;
         } catch (Throwable t) {
             Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen: ", t);
         }
