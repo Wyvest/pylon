@@ -3,10 +3,7 @@ package pl.tomgirl.pylon.bakery.patch;
 import java.nio.IntBuffer;
 
 import org.lwjgl.LWJGLException;
-import org.lwjgl.openal.AL;
-import org.lwjgl.openal.ALC;
-import org.lwjgl.openal.ALC10;
-import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.*;
 import org.lwjgl.system.MemoryStack;
 
 import static org.lwjgl.openal.AL.createCapabilities;
@@ -73,15 +70,18 @@ public abstract class ALPatch {
     }
 
     private static IntBuffer createAttributeList(int contextFrequency, int contextRefresh, int contextSynchronized, MemoryStack stack) {
-        IntBuffer buffer = stack.callocInt(7);
-        buffer.put(0, 4103);
-        buffer.put(1, contextFrequency);
-        buffer.put(2, 4104);
-        buffer.put(3, contextRefresh);
-        buffer.put(4, 4105);
-        buffer.put(5, contextSynchronized);
-        buffer.put(6, 0);
-        return buffer;
+        IntBuffer buf = stack.callocInt(5 * 2 + 1);
+        buf.put(ALC10.ALC_FREQUENCY).put(contextFrequency);
+        buf.put(ALC10.ALC_REFRESH).put(contextRefresh);
+        buf.put(ALC10.ALC_SYNC).put(contextSynchronized);
+
+        if (ALC10.alcGetInteger(_devicePtr, SOFTHRTF.ALC_NUM_HRTF_SPECIFIERS_SOFT) > 0) {
+            buf.put(SOFTHRTF.ALC_HRTF_SOFT).put(0);
+            buf.put(SOFTHRTF.ALC_HRTF_ID_SOFT).put(0);
+        }
+
+        buf.put(0).flip();
+        return buf;
     }
 
     @CompatStub
