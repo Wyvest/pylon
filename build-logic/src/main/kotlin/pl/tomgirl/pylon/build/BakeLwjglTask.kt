@@ -83,15 +83,17 @@ abstract class BakeLwjglTask : DefaultTask() {
             method.invisibleAnnotations?.removeIf { it.desc == STUB }
             target.methods.add(method)
         }
-        // forge workaround
+        // forge / early game crash workaround
         if (target.name == "org/lwjgl/opengl/GL11") {
             val getString = target.find("glGetString", "(I)Ljava/lang/String;") ?: error("Missing GL11.glGetString")
+            val hasContext = LabelNode()
             getString.instructions.insert(InsnList().apply {
-                add(MethodInsnNode(
-                    Opcodes.INVOKESTATIC, "org/lwjgl/opengl/GL", "getCapabilities",
-                    "()Lorg/lwjgl/opengl/GLCapabilities;", false,
-                ))
-                add(InsnNode(Opcodes.POP))
+                add(MethodInsnNode(Opcodes.INVOKESTATIC, target.name, $$"pylon$assertContext", "()Z", false))
+                add(JumpInsnNode(Opcodes.IFEQ, hasContext))
+                add(LdcInsnNode(""))
+                add(InsnNode(Opcodes.ARETURN))
+                add(hasContext)
+                add(FrameNode(Opcodes.F_SAME, 0, null, 0, null))
             })
         }
         if (target.name == "org/lwjgl/openal/AL") {

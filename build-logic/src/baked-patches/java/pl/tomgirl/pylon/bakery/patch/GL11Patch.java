@@ -4,12 +4,25 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
 @SuppressWarnings("unused")
 public abstract class GL11Patch {
+    private static boolean pylon$assertContext() {
+        try {
+            GL.getCapabilities();
+            return false;
+        } catch (IllegalStateException e) {
+            Logger.getLogger("Pylon").log(Level.SEVERE, "glGetString called without a GL context", e);
+            return true;
+        }
+    }
+
     @CompatStub
     private static void glDrawElements(int mode, int count, int type, ByteBuffer indices) {
         GL11.nglDrawElements(mode, count, type, MemoryUtil.memAddress(indices));
