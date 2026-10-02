@@ -174,8 +174,11 @@ public class DisplaySdl {
     }
 
     public void setDisplayMode(@NotNull DisplayMode mode) {
-        framebufferWidth = width = windowedWidth = mode.getWidth();
-        framebufferHeight = height = windowedHeight = mode.getHeight();
+        width = windowedWidth = mode.getWidth();
+        height = windowedHeight = mode.getHeight();
+        float density = isCreated() ? getPixelDensity() : 1f;
+        framebufferWidth = Math.round(width * density);
+        framebufferHeight = Math.round(height * density);
         windowResized = true;
         resizePending = true;
     }
@@ -222,7 +225,7 @@ public class DisplaySdl {
 
     @SuppressWarnings("resource")
     public DisplayMode getDesktopDisplayMode() {
-        SDL_DisplayMode mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        SDL_DisplayMode mode = SDL_GetDesktopDisplayMode(currentDisplay());
         if (mode == null) {
             DisplayMode best = null;
             for (DisplayMode displayMode : getAvailableDisplayModes()) {
@@ -492,8 +495,7 @@ public class DisplaySdl {
 
         try {
             if (fullscreen) {
-                int display = SDL_GetPrimaryDisplay();
-                if (display == 0) {
+                if (currentDisplay() == 0) {
                     Pylon.LOG.log(Level.WARNING, "Failed to find display");
                     return;
                 }
@@ -516,12 +518,14 @@ public class DisplaySdl {
         }
     }
 
+    private int currentDisplay() {
+        int display = isCreated() ? SDL_GetDisplayForWindow(handle) : 0;
+        return display != 0 ? display : SDL_GetPrimaryDisplay();
+    }
+
     @NotNull
     public DisplayMode[] getAvailableDisplayModes() {
-        int currDisplay = handle != 0 ? SDL_GetDisplayForWindow(handle) : 0;
-        if (currDisplay == 0) {
-            currDisplay = SDL_GetPrimaryDisplay();
-        }
+        int currDisplay = currentDisplay();
         if (currDisplay == 0) {
             return new DisplayMode[0];
         }
