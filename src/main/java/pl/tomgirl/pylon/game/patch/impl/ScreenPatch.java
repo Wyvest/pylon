@@ -9,7 +9,7 @@ import pl.tomgirl.pylon.game.patch.Patch;
 
 public final class ScreenPatch extends Patch {
     private static final String CLIPBOARD = "java/awt/datatransfer/Clipboard";
-    private final Map<Method, ClipboardMethod> methods = new HashMap<>();
+    private final Map<Method, ScreenMethod> methods = new HashMap<>();
 
     public ScreenPatch(ClassVisitor next) { super(next); }
 
@@ -19,6 +19,7 @@ public final class ScreenPatch extends Patch {
         return new MethodVisitor(Opcodes.ASM9, next) {
             private boolean gets;
             private boolean sets;
+            private boolean desktop;
 
             @Override
             public void visitMethodInsn(int opcode, String owner, String called, String calledDescriptor, boolean itf) {
@@ -30,9 +31,16 @@ public final class ScreenPatch extends Patch {
             }
 
             @Override
+            public void visitLdcInsn(Object value) {
+                desktop |= "java.awt.Desktop".equals(value);
+                super.visitLdcInsn(value);
+            }
+
+            @Override
             public void visitEnd() {
-                if (gets && descriptor.equals("()Ljava/lang/String;")) methods.put(new Method(name, descriptor), ClipboardMethod.GET);
-                if (sets && descriptor.equals("(Ljava/lang/String;)V")) methods.put(new Method(name, descriptor), ClipboardMethod.SET);
+                if (gets && descriptor.equals("()Ljava/lang/String;")) methods.put(new Method(name, descriptor), ScreenMethod.GET_CLIPBOARD);
+                if (sets && descriptor.equals("(Ljava/lang/String;)V")) methods.put(new Method(name, descriptor), ScreenMethod.SET_CLIPBOARD);
+                if (desktop && descriptor.equals("(Ljava/net/URI;)V")) methods.put(new Method(name, descriptor), ScreenMethod.OPEN_LINK);
                 super.visitEnd();
             }
         };
@@ -48,25 +56,29 @@ public final class ScreenPatch extends Patch {
         return new ClassVisitor(Opcodes.ASM9, writer) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                ClipboardMethod patch = methods.get(new Method(name, descriptor));
+                ScreenMethod patch = methods.get(new Method(name, descriptor));
                 if (patch == null) return super.visitMethod(access, name, descriptor, signature, exceptions);
                 MethodVisitor method = super.visitMethod(access, name, descriptor, signature, exceptions);
                 int argumentSlot = (access & Opcodes.ACC_STATIC) != 0 ? 0 : 1;
                 method.visitCode();
-                if (patch == ClipboardMethod.GET) {
+                if (patch == ScreenMethod.GET_CLIPBOARD) {
                     method.visitMethodInsn(Opcodes.INVOKESTATIC, HOOKS, "getClipboard", "()Ljava/lang/String;", false);
                     method.visitInsn(Opcodes.ARETURN);
-                } else {
+                } else if (patch == ScreenMethod.SET_CLIPBOARD) {
                     method.visitVarInsn(Opcodes.ALOAD, argumentSlot);
                     method.visitMethodInsn(Opcodes.INVOKESTATIC, HOOKS, "setClipboard", "(Ljava/lang/String;)V", false);
                     method.visitInsn(Opcodes.RETURN);
+                } else {
+                    method.visitVarInsn(Opcodes.ALOAD, argumentSlot);
+                    method.visitMethodInsn(Opcodes.INVOKESTATIC, HOOKS, "openLink", "(Ljava/net/URI;)V", false);
+                    method.visitInsn(Opcodes.RETURN);
                 }
-                method.visitMaxs(1, argumentSlot + (patch == ClipboardMethod.GET ? 0 : 1));
+                method.visitMaxs(1, argumentSlot + (patch == ScreenMethod.GET_CLIPBOARD ? 0 : 1));
                 method.visitEnd();
                 return null;
             }
         };
     }
 
-    private enum ClipboardMethod { GET, SET }
+    private enum ScreenMethod { GET_CLIPBOARD, SET_CLIPBOARD, OPEN_LINK }
 }

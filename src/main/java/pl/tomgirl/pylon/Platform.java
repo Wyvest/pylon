@@ -1,48 +1,25 @@
 package pl.tomgirl.pylon;
 
-import java.io.IOException;
-import java.net.URI;
+import org.lwjgl.sdl.SDLError;
+import org.lwjgl.sdl.SDLMisc;
+import pl.tomgirl.pylon.window.MainThread;
 import java.util.Locale;
 import java.util.logging.Level;
 
 public enum Platform {
     UNIX(),
-    MACOS() {
-        @Override
-        protected String[] getProcessArguments(String uri) {
-            return new String[]{"open", uri};
-        }
-    },
-    WINDOWS() {
-        @Override
-        protected String[] getProcessArguments(String uri) {
-            return new String[]{"rundll32", "url.dll,FileProtocolHandler", uri};
-        }
-    },
+    MACOS(),
+    WINDOWS(),
     UNKNOWN();
 
     public static final Platform CURRENT = getPlatform();
 
-    public void open(String uri) { // TODO: Validate URI
-        try {
-            Process process = Runtime.getRuntime().exec(this.getProcessArguments(uri));
-            process.getInputStream().close();
-            process.getErrorStream().close();
-            process.getOutputStream().close();
-        } catch (IOException e) {
-            Pylon.LOG.log(Level.SEVERE, "Could not open uri " + uri, e);
-        }
-    }
-
-    protected String[] getProcessArguments(String uri) {
-        try {
-            URI parsed = new URI(uri);
-            if ("file".equals(parsed.getScheme())) {
-                uri = uri.replace("file:", "file://");
+    public void open(String uri) {
+        MainThread.run(() -> {
+            if (!SDLMisc.SDL_OpenURL(uri)) {
+                Pylon.LOG.log(Level.SEVERE, "Could not open URI " + uri + ": " + SDLError.SDL_GetError());
             }
-        } catch (Exception ignored) {}
-
-        return new String[]{"xdg-open", uri};
+        });
     }
 
     private static Platform getPlatform() {

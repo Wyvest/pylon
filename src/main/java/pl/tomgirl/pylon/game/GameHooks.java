@@ -3,15 +3,14 @@ package pl.tomgirl.pylon.game;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import pl.tomgirl.pylon.window.MainThread;
+import java.net.URI;
 import java.nio.ByteBuffer;
-
 import javax.imageio.ImageIO;
-
 import org.lwjgl.sdl.SDLClipboard;
-
+import pl.tomgirl.pylon.Platform;
 import pl.tomgirl.pylon.Pylon;
 import pl.tomgirl.pylon.window.DisplaySdl;
+import pl.tomgirl.pylon.window.MainThread;
 
 @SuppressWarnings("unused")
 public final class GameHooks {
@@ -26,6 +25,10 @@ public final class GameHooks {
 
     public static void setClipboard(String text) {
         MainThread.run(() -> SDLClipboard.SDL_SetClipboardText(text));
+    }
+
+    public static void openLink(URI link) {
+        Platform.CURRENT.open(link.toString());
     }
 
     public static void setIcon() {
