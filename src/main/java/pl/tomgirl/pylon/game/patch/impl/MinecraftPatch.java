@@ -16,6 +16,8 @@ public final class MinecraftPatch extends Patch {
     private final List<Method> screenCandidates = new ArrayList<>();
     private String owner;
     private Method openScreen;
+    private Method resizeGuard;
+    private int resizeGuardIndex;
     private boolean displayCreate;
     private boolean displayTitle;
 
@@ -38,6 +40,8 @@ public final class MinecraftPatch extends Patch {
         return new MethodVisitor(Opcodes.ASM9, next) {
             private final Set<String> reads = new HashSet<>();
             private final Set<String> writes = new HashSet<>();
+            private int booleanReads;
+            private int lastBooleanRead = -1;
 
             @Override
             public void visitFieldInsn(int opcode, String fieldOwner, String field, String fieldDescriptor) {
@@ -45,6 +49,7 @@ public final class MinecraftPatch extends Patch {
                     if (opcode == Opcodes.GETFIELD) reads.add(field);
                     if (opcode == Opcodes.PUTFIELD) writes.add(field);
                 }
+                lastBooleanRead = isBooleanRead(opcode, fieldOwner, fieldDescriptor) ? booleanReads++ : -1;
                 super.visitFieldInsn(opcode, fieldOwner, field, fieldDescriptor);
             }
 
@@ -53,7 +58,12 @@ public final class MinecraftPatch extends Patch {
                 if (calledOwner.equals(DISPLAY)) {
                     displayCreate |= called.equals("create") && calledDescriptor.endsWith(")V");
                     displayTitle |= called.equals("setTitle") && calledDescriptor.equals("(Ljava/lang/String;)V");
+                    if (called.equals("wasResized") && lastBooleanRead >= 0) {
+                        resizeGuard = new Method(name, descriptor);
+                        resizeGuardIndex = lastBooleanRead;
+                    }
                 }
+                lastBooleanRead = -1;
                 super.visitMethodInsn(opcode, calledOwner, called, calledDescriptor, itf);
             }
 
@@ -94,7 +104,20 @@ public final class MinecraftPatch extends Patch {
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor method = super.visitMethod(access, name, descriptor, signature, exceptions);
                 boolean patchesScreen = new Method(name, descriptor).equals(openScreen);
+                boolean patchesResize = new Method(name, descriptor).equals(resizeGuard);
                 return new MethodVisitor(Opcodes.ASM9, method) {
+                    private int booleanReads;
+
+                    @Override
+                    public void visitFieldInsn(int opcode, String fieldOwner, String field, String fieldDescriptor) {
+                        if (patchesResize && isBooleanRead(opcode, fieldOwner, fieldDescriptor) && booleanReads++ == resizeGuardIndex) {
+                            super.visitInsn(Opcodes.POP);
+                            super.visitInsn(Opcodes.ICONST_0);
+                            return;
+                        }
+                        super.visitFieldInsn(opcode, fieldOwner, field, fieldDescriptor);
+                    }
+
                     @Override
                     public void visitMethodInsn(int opcode, String calledOwner, String called, String calledDescriptor, boolean itf) {
                         super.visitMethodInsn(opcode, calledOwner, called, calledDescriptor, itf);
@@ -119,5 +142,9 @@ public final class MinecraftPatch extends Patch {
                 };
             }
         };
+    }
+
+    private boolean isBooleanRead(int opcode, String fieldOwner, String fieldDescriptor) {
+        return opcode == Opcodes.GETFIELD && fieldOwner.equals(owner) && fieldDescriptor.equals("Z");
     }
 }
