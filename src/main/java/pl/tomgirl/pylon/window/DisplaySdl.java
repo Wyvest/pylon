@@ -170,6 +170,14 @@ public class DisplaySdl {
 
     @NotNull
     public DisplayMode getDisplayMode() {
+        if (!isCreated() && fullscreenDeferred) {
+            initializeVideo();
+            SDL_DisplayMode mode = SDL_GetDesktopDisplayMode(currentDisplay());
+            if (mode != null) {
+                float density = highPixelDensity ? mode.pixel_density() : 1f;
+                return new DisplayMode(Math.round(mode.w() * density), Math.round(mode.h() * density), 24, 60);
+            }
+        }
         return new DisplayMode(framebufferWidth, framebufferHeight, 24, 60);
     }
 

@@ -10,7 +10,7 @@ loom {
             displayName = "Fabric 1.8.9"
             generateRunConfig = true
             preferGradleTask = true
-            programArguments.addAll("--username", "Player", "--accessToken", "0")
+            programArguments.addAll("--username", "Player", "--accessToken", "0", "--fullscreen")
             jvmArguments.add("-Djava.util.logging.config.file=${rootProject.file("runs/logging.properties")}")
             jvmArguments.add("--enable-native-access=ALL-UNNAMED")
         }
