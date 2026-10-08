@@ -60,11 +60,8 @@ public class DisplaySdl {
     private boolean minimized;
     private boolean fullscreen;
     private boolean fullscreenDeferred;
-    private boolean borderlessFullscreen;
     private boolean exclusiveFullscreen;
     private DisplayMode fullscreenDisplayMode;
-    private int windowedX;
-    private int windowedY;
     private boolean focused;
     private boolean closeRequested;
 
@@ -386,17 +383,12 @@ public class DisplaySdl {
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                     onFramebufferResize(handle, windowEvent.data1(), windowEvent.data2());
                     break;
-                case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-                    if (borderlessFullscreen) {
-                        enterBorderlessFullscreen();
-                    }
-                    break;
                 case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
                     fullscreen = true;
                     windowResized = true;
                     break;
                 case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-                    fullscreen = borderlessFullscreen;
+                    fullscreen = false;
                     windowResized = true;
                     break;
                 case SDL_EVENT_KEY_DOWN:
@@ -481,14 +473,7 @@ public class DisplaySdl {
         }
 
         setFullscreen(fullscreenDeferred);
-        resizePending = true;
-
-        Mouse.create();
-        Keyboard.create();
         MainThread.run(() -> {
-            checkSdlError(SDL_ShowWindow(handle));
-            checkSdlError(SDL_RaiseWindow(handle));
-            SDL_SyncWindow(handle);
             try (MemoryStack ms = stackPush()) {
                 IntBuffer width = ms.mallocInt(1);
                 IntBuffer height = ms.mallocInt(1);
@@ -496,6 +481,14 @@ public class DisplaySdl {
                 framebufferWidth = Math.max(1, width.get(0));
                 framebufferHeight = Math.max(1, height.get(0));
             }
+        });
+        resizePending = true;
+
+        Mouse.create();
+        Keyboard.create();
+        MainThread.run(() -> {
+            checkSdlError(SDL_ShowWindow(handle));
+            checkSdlError(SDL_RaiseWindow(handle));
             if (SDL_IsMainThread()) {
                 SDL_PumpEvents();
             }
@@ -550,55 +543,21 @@ public class DisplaySdl {
                 height = windowedHeight;
             }
             MainThread.run(() -> {
-                if (!fullscreen || exclusiveFullscreen || !enterBorderlessFullscreen()) {
-                    leaveBorderlessFullscreen();
-                    if (fullscreen) {
-                        try (MemoryStack ms = stackPush()) {
-                            if (!SDL_SetWindowFullscreenMode(handle, exclusiveFullscreen ? exclusiveDisplayMode(ms) : null)) {
-                                Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen display mode: " + SDL_GetError());
-                            }
+                if (fullscreen) {
+                    try (MemoryStack ms = stackPush()) {
+                        if (!SDL_SetWindowFullscreenMode(handle, exclusiveFullscreen ? exclusiveDisplayMode(ms) : null)) {
+                            Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen display mode: " + SDL_GetError());
                         }
                     }
-                    SDL_SetWindowFullscreen(handle, fullscreen);
-                    SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
                 }
+                SDL_SetWindowFullscreen(handle, fullscreen);
+                SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
             });
             windowResized = true;
             resizePending = true;
         } catch (Throwable t) {
             Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen: ", t);
         }
-    }
-
-    private boolean enterBorderlessFullscreen() {
-        if (!"Windows".equals(SDLPlatform.SDL_GetPlatform())) {
-            return false;
-        }
-        try (MemoryStack ms = stackPush()) {
-            if (!borderlessFullscreen && (SDL_GetWindowFlags(handle) & SDL_WINDOW_FULLSCREEN) != 0) {
-                SDL_SetWindowFullscreen(handle, false);
-                SDL_SyncWindow(handle);
-            }
-            SDL_Rect bounds = SDL_Rect.malloc(ms);
-            if (!SDL_GetDisplayBounds(currentDisplay(), bounds)) {
-                return false;
-            }
-            if (!borderlessFullscreen) {
-                IntBuffer x = ms.mallocInt(1);
-                IntBuffer y = ms.mallocInt(1);
-                SDL_RestoreWindow(handle);
-                SDL_SyncWindow(handle);
-                SDL_GetWindowPosition(handle, x, y);
-                windowedX = x.get(0);
-                windowedY = y.get(0);
-            }
-            SDL_SetWindowBordered(handle, false);
-            SDL_SetWindowSize(handle, bounds.w() + 1, bounds.h());
-            SDL_SetWindowPosition(handle, bounds.x(), bounds.y());
-        }
-        borderlessFullscreen = true;
-        fullscreen = true;
-        return true;
     }
 
     private SDL_DisplayMode exclusiveDisplayMode(MemoryStack ms) {
@@ -633,18 +592,6 @@ public class DisplaySdl {
             }
         }
         SDLStdinc.SDL_free(modes);
-    }
-
-    private void leaveBorderlessFullscreen() {
-        if (borderlessFullscreen) {
-            borderlessFullscreen = false;
-            fullscreen = false;
-            SDL_SetWindowBordered(handle, true);
-            SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
-            SDL_SetWindowPosition(handle, windowedX, windowedY);
-            // so currentDisplay() sees the restored bounds
-            SDL_SyncWindow(handle);
-        }
     }
 
     private int currentDisplay() {
