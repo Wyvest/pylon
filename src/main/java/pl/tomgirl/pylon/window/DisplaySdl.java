@@ -542,7 +542,16 @@ public class DisplaySdl {
                 width = windowedWidth;
                 height = windowedHeight;
             }
-            MainThread.run(() -> {
+            if (fullscreen && exclusiveFullscreen &&
+                MainThread.call(() -> (
+                    SDL_GetWindowFlags(handle) & SDL_WINDOW_FULLSCREEN) != 0
+                    && SDL_GetWindowFullscreenMode(handle) == null
+                )
+                && MainThread.call(() -> SDL_SetWindowFullscreen(handle, false))
+            ) {
+                awaitFullscreen(false);
+            }
+            boolean changed = MainThread.call(() -> {
                 if (fullscreen) {
                     try (MemoryStack ms = stackPush()) {
                         if (!SDL_SetWindowFullscreenMode(handle, exclusiveFullscreen ? exclusiveDisplayMode(ms) : null)) {
@@ -550,13 +559,31 @@ public class DisplaySdl {
                         }
                     }
                 }
-                SDL_SetWindowFullscreen(handle, fullscreen);
-                SDL_SetWindowSize(handle, windowedWidth, windowedHeight);
+                if (!SDL_SetWindowFullscreen(handle, fullscreen)) {
+                    Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen: " + SDL_GetError());
+                    return false;
+                }
+                return (SDL_GetWindowFlags(handle) & SDL_WINDOW_HIDDEN) == 0;
             });
+            if (changed) {
+                awaitFullscreen(fullscreen);
+            }
+            if (!fullscreen) {
+                MainThread.run(() -> SDL_SetWindowSize(handle, windowedWidth, windowedHeight));
+            }
             windowResized = true;
             resizePending = true;
         } catch (Throwable t) {
             Pylon.LOG.log(Level.WARNING, "Failed to set fullscreen: ", t);
+        }
+    }
+
+    private void awaitFullscreen(boolean fullscreen) throws InterruptedException {
+        for (int i = 0; i < 250 && MainThread.call(() -> {
+            SDL_PumpEvents();
+            return (SDL_GetWindowFlags(handle) & SDL_WINDOW_FULLSCREEN) != 0;
+        }) != fullscreen; i++) {
+            Thread.sleep(10);
         }
     }
 
