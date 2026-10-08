@@ -13,6 +13,7 @@ public class Mouse {
     public static final int EVENT_SIZE = 1 + 1 + 4 + 4 + 4 + 8;
 
     private static final int MAX_BUTTONS = Integer.SIZE;
+    private static final int LWJGL2_WHEEL_STEP = 120;
     private static final MouseSdl SDL = MouseSdl.instance();
     private static final Map<String, Integer> BUTTON_INDICES = new HashMap<>(32);
     private static final MouseSdl.PollState pollState = new MouseSdl.PollState();
@@ -143,7 +144,7 @@ public class Mouse {
     public static int getDWheel() {
         int result = (int) pollState.wheelDelta;
         pollState.wheelDelta -= result;
-        return result;
+        return result * LWJGL2_WHEEL_STEP;
     }
 
     public static boolean isButtonDown(int button) {
@@ -223,7 +224,7 @@ public class Mouse {
     }
 
     public static int getEventDWheel() {
-        return (int) eventWheelDelta;
+        return (int) eventWheelDelta * LWJGL2_WHEEL_STEP;
     }
 
     public static long getEventNanoseconds() {
