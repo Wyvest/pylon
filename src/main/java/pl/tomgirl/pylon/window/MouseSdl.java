@@ -37,18 +37,18 @@ public class MouseSdl {
         clearState();
     }
 
-    private void putMouseEvent(byte button, boolean state, int deltaWheel, long nanos) {
+    private void putMouseEvent(byte button, boolean state, long nanos) {
         if (grabbed) {
-            putMouseEvent(button, state, 0, 0, deltaWheel, nanos);
+            putMouseEvent(button, state, 0, 0, 0, nanos);
         } else {
-            putMouseEvent(button, state, lastX, lastY, deltaWheel, nanos);
+            putMouseEvent(button, state, lastX, lastY, 0, nanos);
         }
     }
 
-    private void putMouseEvent(byte button, boolean state, double x, double y, int deltaWheel, long nanos) {
+    private void putMouseEvent(byte button, boolean state, double x, double y, double wheelDelta, long nanos) {
         Event event = events.claim();
         if (event != null) {
-            event.set(button, state, x, y, deltaWheel, nanos);
+            event.set(button, state, x, y, wheelDelta, nanos);
         }
     }
 
@@ -92,7 +92,7 @@ public class MouseSdl {
         for (int button = 0; button < buttonStates.length; button++) {
             if (buttonStates[button]) {
                 buttonStates[button] = false;
-                putMouseEvent((byte) button, false, 0, nanos);
+                putMouseEvent((byte) button, false, nanos);
             }
         }
         insideWindow = false;
@@ -171,7 +171,7 @@ public class MouseSdl {
                 }
 
                 if (grabbed) {
-                    putMouseEvent(button, down, 0, timestamp);
+                    putMouseEvent(button, down, timestamp);
                 } else {
                     putMouseEvent(
                         button,
@@ -188,13 +188,13 @@ public class MouseSdl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                int yOffset = wheelEvent.integer_y();
+                float yOffset = wheelEvent.y();
                 if (yOffset == 0) {
                     break;
                 }
                 accumDz += yOffset;
                 if (grabbed) {
-                    putMouseEvent((byte) -1, false, yOffset, wheelEvent.timestamp());
+                    putMouseEvent((byte) -1, false, 0, 0, yOffset, wheelEvent.timestamp());
                 } else {
                     putMouseEvent(
                         (byte) -1,
@@ -268,7 +268,7 @@ public class MouseSdl {
         public double y;
         public double dx;
         public double dy;
-        /// Wheel movement in notches. [org.lwjgl.input.Mouse] multiplies it by 120 to report LWJGL2 units.
+        /// Precise wheel movement in notches. [org.lwjgl.input.Mouse] multiplies it by 120 to report LWJGL2 units.
         public double wheelDelta;
         public final boolean[] buttons;
 
@@ -282,7 +282,7 @@ public class MouseSdl {
         public boolean state;
         public double x;
         public double y;
-        /// Wheel movement in notches. [org.lwjgl.input.Mouse] multiplies it by 120 to report LWJGL2 units.
+        /// Precise wheel movement in notches. [org.lwjgl.input.Mouse] multiplies it by 120 to report LWJGL2 units.
         public double wheelDelta;
         public long nanos;
 
