@@ -116,6 +116,10 @@ public class Display {
         SDL.setVSyncEnabled(enabled);
     }
 
+    public static void setLocation(int x, int y) {
+        SDL.setLocation(x, y);
+    }
+
     public static boolean wasResized() {
         return SDL.wasResized();
     }

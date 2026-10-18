@@ -737,6 +737,12 @@ public class DisplaySdl {
         }
     }
 
+    public void setLocation(int x, int y) {
+        if (isCreated()) {
+            MainThread.run(() -> checkSdlError(SDL_SetWindowPosition(handle, x, y)));
+        }
+    }
+
     public boolean wasResized() {
         return windowResized;
     }
