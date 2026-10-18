@@ -67,6 +67,7 @@ public class MainThread {
 
     private static void execute() {
         thread = Thread.currentThread();
+        thread.setContextClassLoader(MainThread.class.getClassLoader());
         executing = true;
         try {
             result = task.get();
