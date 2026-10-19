@@ -58,6 +58,7 @@ public class DisplaySdl {
     private boolean resizable;
     private boolean windowResized = true;
     private boolean resizePending;
+    private boolean resizeChecked;
     private boolean minimized;
     private boolean fullscreen;
     private boolean fullscreenDeferred;
@@ -357,8 +358,9 @@ public class DisplaySdl {
             return;
         }
 
-        windowResized = resizePending;
+        windowResized = resizePending || (windowResized && !resizeChecked);
         resizePending = false;
+        resizeChecked = false;
         MainThread.run(this::pollEvents);
         updateTextInputState();
         Keyboard.poll();
@@ -596,6 +598,16 @@ public class DisplaySdl {
             if (!fullscreen) {
                 MainThread.run(() -> SDL_SetWindowSize(handle, windowedWidth, windowedHeight));
             }
+            MainThread.run(() -> {
+                try (MemoryStack ms = stackPush()) {
+                    IntBuffer width = ms.mallocInt(1);
+                    IntBuffer height = ms.mallocInt(1);
+                    checkSdlError(SDL_GetWindowSize(handle, width, height));
+                    resizeCallback(handle, width.get(0), height.get(0));
+                    checkSdlError(SDL_GetWindowSizeInPixels(handle, width, height));
+                    onFramebufferResize(handle, width.get(0), height.get(0));
+                }
+            });
             windowResized = true;
             resizePending = true;
         } catch (Throwable t) {
@@ -744,6 +756,7 @@ public class DisplaySdl {
     }
 
     public boolean wasResized() {
+        resizeChecked = true;
         return windowResized;
     }
 
