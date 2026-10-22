@@ -12,7 +12,7 @@ import static org.lwjgl.sdl.SDLEvents.*;
 import static org.lwjgl.sdl.SDLMouse.*;
 
 public class MouseSdl {
-    private static final int EVENT_QUEUE_SIZE = 100;
+    private static final int EVENT_QUEUE_SIZE = 512;
     private static final int BUTTON_COUNT = Integer.SIZE;
 
     private static final DisplaySdl DISPLAY = DisplaySdl.instance();
@@ -54,7 +54,7 @@ public class MouseSdl {
 
     private void putMouseMotionEvent(double x, double y, long nanos) {
         Event last = events.peekLast();
-        if (last != null && last.button == -1) {
+        if (last != null && last.button == -1 && last.wheelDelta == 0 && (grabbed || events.size() >= EVENT_QUEUE_SIZE / 2)) {
             if (grabbed) {
                 last.x += x;
                 last.y += y;
