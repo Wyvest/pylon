@@ -156,7 +156,10 @@ abstract class BakeLwjglTask : DefaultTask() {
             "org/lwjgl/openal/AL10" to "AL10Patch",
             "org/lwjgl/opengl/GL11" to "GL11Patch",
             "org/lwjgl/opengl/GL20" to "GL20Patch",
+            "org/lwjgl/opengl/ARBOcclusionQuery" to "ARBOcclusionQueryPatch",
+            "org/lwjgl/opengl/ARBPixelBufferObject" to "ARBPixelBufferObjectPatch",
             "org/lwjgl/opengl/ARBShaderObjects" to "ARBShaderObjectsPatch",
+            "org/lwjgl/opengl/ARBVertexShader" to "ARBVertexShaderPatch",
         )
         val capabilityExtensions = listOf(
             "GL_EXT_multi_draw_arrays", "GL_EXT_paletted_texture", "GL_EXT_rescale_normal",

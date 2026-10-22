@@ -9,6 +9,7 @@ import java.util.logging.Level;
 
 import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.Drawable;
+import pl.tomgirl.pylon.Platform;
 import pl.tomgirl.pylon.Pylon;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -57,6 +58,7 @@ public class DisplaySdl {
     private boolean resizable;
     private boolean windowResized = true;
     private boolean resizePending;
+    private boolean resizeChecked;
     private boolean minimized;
     private boolean fullscreen;
     private boolean fullscreenDeferred;
@@ -356,8 +358,9 @@ public class DisplaySdl {
             return;
         }
 
-        windowResized = resizePending;
+        windowResized = resizePending || (windowResized && !resizeChecked);
         resizePending = false;
+        resizeChecked = false;
         MainThread.run(this::pollEvents);
         updateTextInputState();
         Keyboard.poll();
@@ -365,6 +368,9 @@ public class DisplaySdl {
     }
 
     private void pollEvents() {
+        if (Platform.CURRENT == Platform.MACOS) {
+            AppKitEvents.repost();
+        }
         while (SDL_PollEvent(event)) {
             switch (event.type()) {
                 case SDL_EVENT_QUIT:
@@ -505,6 +511,9 @@ public class DisplaySdl {
         Mouse.create();
         Keyboard.create();
         MainThread.run(() -> {
+            if (Platform.CURRENT == Platform.MACOS) {
+                AppKitEvents.install();
+            }
             checkSdlError(SDL_ShowWindow(handle));
             checkSdlError(SDL_RaiseWindow(handle));
             if (SDL_IsMainThread()) {
@@ -589,6 +598,16 @@ public class DisplaySdl {
             if (!fullscreen) {
                 MainThread.run(() -> SDL_SetWindowSize(handle, windowedWidth, windowedHeight));
             }
+            MainThread.run(() -> {
+                try (MemoryStack ms = stackPush()) {
+                    IntBuffer width = ms.mallocInt(1);
+                    IntBuffer height = ms.mallocInt(1);
+                    checkSdlError(SDL_GetWindowSize(handle, width, height));
+                    resizeCallback(handle, width.get(0), height.get(0));
+                    checkSdlError(SDL_GetWindowSizeInPixels(handle, width, height));
+                    onFramebufferResize(handle, width.get(0), height.get(0));
+                }
+            });
             windowResized = true;
             resizePending = true;
         } catch (Throwable t) {
@@ -730,7 +749,14 @@ public class DisplaySdl {
         }
     }
 
+    public void setLocation(int x, int y) {
+        if (isCreated()) {
+            MainThread.run(() -> checkSdlError(SDL_SetWindowPosition(handle, x, y)));
+        }
+    }
+
     public boolean wasResized() {
+        resizeChecked = true;
         return windowResized;
     }
 

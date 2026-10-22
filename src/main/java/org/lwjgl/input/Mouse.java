@@ -38,6 +38,7 @@ public class Mouse {
     private static double eventDx;
     private static double eventDy;
     private static double eventWheelDelta;
+    private static double eventWheelRemainder;
     private static double lastRawEventX;
     private static double lastRawEventY;
     private static long eventNanos;
@@ -74,6 +75,7 @@ public class Mouse {
 
     private static void resetMouse() {
         pollState.dx = pollState.dy = pollState.wheelDelta = 0;
+        eventWheelRemainder = eventWheelDelta = 0;
     }
 
     public static void create() throws LWJGLException {
@@ -147,6 +149,12 @@ public class Mouse {
         return result * LWJGL2_WHEEL_STEP;
     }
 
+    public static double getDWheelPrecise() {
+        double delta = pollState.wheelDelta;
+        pollState.wheelDelta = 0;
+        return delta;
+    }
+
     public static boolean isButtonDown(int button) {
         checkCreated();
         return button >= 0 && button < buttonCount && pollState.buttons[button];
@@ -194,6 +202,7 @@ public class Mouse {
             eventX = clamp(eventX, Display.getWidth());
             eventY = clamp(eventY, Display.getHeight());
         }
+        eventWheelRemainder = (eventWheelRemainder + eventWheelDelta) % 1;
         eventWheelDelta = event.wheelDelta;
         eventNanos = event.nanos;
         return true;
@@ -224,7 +233,11 @@ public class Mouse {
     }
 
     public static int getEventDWheel() {
-        return (int) eventWheelDelta * LWJGL2_WHEEL_STEP;
+        return (int) (eventWheelRemainder + eventWheelDelta) * LWJGL2_WHEEL_STEP;
+    }
+
+    public static double getEventDWheelPrecise() {
+        return eventWheelDelta;
     }
 
     public static long getEventNanoseconds() {

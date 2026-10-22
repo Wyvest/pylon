@@ -11,6 +11,8 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
+import static org.lwjgl.opengl.GL11.*;
+
 @SuppressWarnings("unused")
 public abstract class GL11Patch {
     private static boolean pylon$assertContext() {
@@ -30,27 +32,32 @@ public abstract class GL11Patch {
 
     @CompatStub
     private static void glTexCoordPointer(int i, int stride, FloatBuffer pointer) {
-        GL11.glTexCoordPointer(i, 0x1406, stride, pointer);
+        GL11.glTexCoordPointer(i, GL_FLOAT, stride, pointer);
     }
 
     @CompatStub
     private static void glTexCoordPointer(int i, int stride, ShortBuffer pointer) {
-        GL11.glTexCoordPointer(i, 0x1402, stride, pointer);
+        GL11.glTexCoordPointer(i, GL_SHORT, stride, pointer);
     }
 
     @CompatStub
     private static void glColorPointer(int i, boolean bl, int i2, ByteBuffer pointer) {
-        GL11.glColorPointer(i, 0x1401, i2, pointer);
+        GL11.glColorPointer(i, GL_UNSIGNED_BYTE, i2, pointer);
     }
 
     @CompatStub
     private static void glVertexPointer(int i, int i2, FloatBuffer pointer) {
-        GL11.glVertexPointer(i, 0x1406, i2, pointer);
+        GL11.glVertexPointer(i, GL_FLOAT, i2, pointer);
     }
 
     @CompatStub
     private static void glNormalPointer(int stride, ByteBuffer pointer) {
-        GL11.glNormalPointer(0x1400, stride, pointer);
+        GL11.glNormalPointer(GL_BYTE, stride, pointer);
+    }
+
+    @CompatStub
+    private static void glNormalPointer(int stride, FloatBuffer pointer) {
+        GL11.glNormalPointer(GL_FLOAT, stride, pointer);
     }
 
     @CompatStub("glGetBooleanv") private static void glGetBoolean(int pname, ByteBuffer params) {}

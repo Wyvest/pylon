@@ -21,6 +21,7 @@ public class MainThread {
     private static volatile Supplier<?> task;
     private static volatile Object result;
     private static volatile Throwable failure;
+    private static boolean executing;
 
     private MainThread() {}
 
@@ -66,11 +67,20 @@ public class MainThread {
 
     private static void execute() {
         thread = Thread.currentThread();
+        thread.setContextClassLoader(MainThread.class.getClassLoader());
+        executing = true;
         try {
             result = task.get();
         } catch (Throwable t) {
             failure = t;
+        } finally {
+            executing = false;
         }
+    }
+
+    /// Whether the AppKit thread is currently running a dispatched task
+    static boolean isExecuting() {
+        return executing;
     }
 
     private static long check(long address) {
