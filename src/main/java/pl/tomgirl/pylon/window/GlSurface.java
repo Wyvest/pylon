@@ -1,9 +1,8 @@
 package pl.tomgirl.pylon.window;
 
-import java.nio.ByteBuffer;
-
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.sdl.SDLPlatform;
@@ -17,11 +16,15 @@ import static org.lwjgl.sdl.SDLVideo.*;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 public class GlSurface implements GpuSurface {
+    private static final float[] OPAQUE = {0f, 0f, 0f, 1f};
+
     private final PixelFormat pixelFormat;
     private long window;
     private long context;
     private boolean glInitialized;
+    private boolean glLibraryLoaded;
     private GLCapabilities capabilities;
+    private boolean forceOpaqueAlpha;
 
     public GlSurface(PixelFormat pixelFormat) {
         this.pixelFormat = pixelFormat;
@@ -33,15 +36,16 @@ public class GlSurface implements GpuSurface {
             throw new IllegalStateException("Surface has already been created");
         }
 
-        MainThread.run(() -> createSdlWindow(title, width, height, resizable));
-
         try {
+            MainThread.run(() -> createSdlWindow(title, width, height, resizable));
             context = check(SDL_GL_CreateContext(window));
-            check(SDL_GL_LoadLibrary((ByteBuffer) null));
             Configuration.OPENGL_EXPLICIT_INIT.set(true);
             GL.create(SDLVideo::SDL_GL_GetProcAddress);
             glInitialized = true;
             capabilities = GL.createCapabilities(MemoryUtil::memCallocPointer);
+            forceOpaqueAlpha = pixelFormat.getAlphaBits() == 0
+                && capabilities.OpenGL30
+                && "Windows".equals(SDLPlatform.SDL_GetPlatform());
             return window;
         } catch (RuntimeException | Error throwable) {
             destroy();
@@ -50,6 +54,11 @@ public class GlSurface implements GpuSurface {
     }
 
     private void createSdlWindow(String title, int width, int height, boolean resizable) {
+        String libraryName = Configuration.OPENGL_LIBRARY_NAME.get();
+        if (libraryName != null) {
+            check(SDL_GL_LoadLibrary(libraryName));
+            glLibraryLoaded = true;
+        }
         int properties = (int) check(SDL_CreateProperties());
         try {
             check(SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED));
@@ -76,7 +85,6 @@ public class GlSurface implements GpuSurface {
             check(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY));
         }
         check(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1));
-        check(SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, pixelFormat.getAlphaBits()));
         check(SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, pixelFormat.getDepthBits()));
         check(SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, pixelFormat.getStencilBits()));
         check(SDL_GL_SetAttribute(SDL_GL_STEREO, pixelFormat.isStereo() ? 1 : 0));
@@ -103,7 +111,18 @@ public class GlSurface implements GpuSurface {
 
     @Override
     public void swapBuffers() {
+        if (forceOpaqueAlpha) {
+            fillAlpha();
+        }
         check(SDL_GL_SwapWindow(window));
+    }
+
+    private void fillAlpha() {
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glColorMask(false, false, false, true);
+        GL30.glClearBufferfv(GL11.GL_COLOR, 0, OPAQUE);
+        GL11.glColorMask(true, true, true, true);
     }
 
     @Override
@@ -119,6 +138,7 @@ public class GlSurface implements GpuSurface {
             memFree(capabilities.getAddressBuffer());
             GL.setCapabilities(null);
             capabilities = null;
+            forceOpaqueAlpha = false;
         }
         if (glInitialized) {
             GL.destroy();
@@ -131,6 +151,10 @@ public class GlSurface implements GpuSurface {
         if (window != 0) {
             MainThread.run(() -> SDL_DestroyWindow(window));
             window = 0;
+        }
+        if (glLibraryLoaded) {
+            MainThread.run(SDLVideo::SDL_GL_UnloadLibrary);
+            glLibraryLoaded = false;
         }
     }
 
